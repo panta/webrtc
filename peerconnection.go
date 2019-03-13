@@ -135,7 +135,7 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 	pc.iceTransport = iceTransport
 
 	// Create the DTLS transport
-	dtlsTransport, err := pc.createDTLSTransport()
+	dtlsTransport, err := pc.api.NewDTLSTransport(pc.iceTransport, pc.configuration.Certificates)
 	if err != nil {
 		return nil, err
 	}
@@ -431,10 +431,6 @@ func (pc *PeerConnection) GetConfiguration() Configuration {
 	return pc.configuration
 }
 
-// ------------------------------------------------------------------------
-// --- FIXME - BELOW CODE NEEDS REVIEW/CLEANUP
-// ------------------------------------------------------------------------
-
 // CreateOffer starts the PeerConnection and generates the localDescription
 func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription, error) {
 	useIdentity := pc.idpLoginURL != nil
@@ -450,31 +446,36 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 	d := sdp.NewJSEPSessionDescription(useIdentity)
 	pc.addFingerprint(d)
 
-	iceParams, err := pc.iceGatherer.GetLocalParameters()
-	if err != nil {
-		return SessionDescription{}, err
+	// iceParams, err := pc.iceGatherer.GetLocalParameters()
+	// if err != nil {
+	// 	return SessionDescription{}, err
+	// }
+
+	// candidates, err := pc.iceGatherer.GetLocalCandidates()
+	// if err != nil {
+	// 	return SessionDescription{}, err
+	// }
+
+	for _, t := range pc.GetTransceivers() {
+		fmt.Println(t)
 	}
 
-	candidates, err := pc.iceGatherer.GetLocalCandidates()
-	if err != nil {
-		return SessionDescription{}, err
-	}
+	// return SessionDescription{}, nil
+	// bundleValue := "BUNDLE"
 
-	bundleValue := "BUNDLE"
+	// if pc.addRTPMediaSection(d, RTPCodecTypeAudio, "audio", iceParams, RTPTransceiverDirectionSendrecv, candidates, sdp.ConnectionRoleActpass) {
+	// 	bundleValue += " audio"
+	// }
+	// if pc.addRTPMediaSection(d, RTPCodecTypeVideo, "video", iceParams, RTPTransceiverDirectionSendrecv, candidates, sdp.ConnectionRoleActpass) {
+	// 	bundleValue += " video"
+	// }
 
-	if pc.addRTPMediaSection(d, RTPCodecTypeAudio, "audio", iceParams, RTPTransceiverDirectionSendrecv, candidates, sdp.ConnectionRoleActpass) {
-		bundleValue += " audio"
-	}
-	if pc.addRTPMediaSection(d, RTPCodecTypeVideo, "video", iceParams, RTPTransceiverDirectionSendrecv, candidates, sdp.ConnectionRoleActpass) {
-		bundleValue += " video"
-	}
+	// pc.addDataMediaSection(d, "data", iceParams, candidates, sdp.ConnectionRoleActpass)
+	// d = d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue+" data")
 
-	pc.addDataMediaSection(d, "data", iceParams, candidates, sdp.ConnectionRoleActpass)
-	d = d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue+" data")
-
-	for _, m := range d.MediaDescriptions {
-		m.WithPropertyAttribute("setup:actpass")
-	}
+	// for _, m := range d.MediaDescriptions {
+	// 	m.WithPropertyAttribute("setup:actpass")
+	// }
 
 	sdp, err := d.Marshal()
 	if err != nil {
@@ -535,11 +536,6 @@ func (pc *PeerConnection) createICETransport() *ICETransport {
 	return t
 }
 
-func (pc *PeerConnection) createDTLSTransport() (*DTLSTransport, error) {
-	dtlsTransport, err := pc.api.NewDTLSTransport(pc.iceTransport, pc.configuration.Certificates)
-	return dtlsTransport, err
-}
-
 // CreateAnswer starts the PeerConnection and generates the localDescription
 func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescription, error) {
 	useIdentity := pc.idpLoginURL != nil
@@ -567,44 +563,33 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 	d := sdp.NewJSEPSessionDescription(useIdentity)
 	pc.addFingerprint(d)
 
-	bundleValue := "BUNDLE"
-	for _, remoteMedia := range pc.RemoteDescription().parsed.MediaDescriptions {
-		// TODO @trivigy better SDP parser
-		var peerDirection RTPTransceiverDirection
-		midValue := ""
-		for _, a := range remoteMedia.Attributes {
-			switch {
-			case strings.HasPrefix(*a.String(), "mid"):
-				midValue = (*a.String())[len("mid:"):]
-			case strings.HasPrefix(*a.String(), "sendrecv"):
-				peerDirection = RTPTransceiverDirectionSendrecv
-			case strings.HasPrefix(*a.String(), "sendonly"):
-				peerDirection = RTPTransceiverDirectionSendonly
-			case strings.HasPrefix(*a.String(), "recvonly"):
-				peerDirection = RTPTransceiverDirectionRecvonly
-			}
-		}
+	// bundleValue := "BUNDLE"
+	// bundleCount := 0
+	// incrementBundle := func() {
+	// 	bundleValue += " " + strconv.Itoa(bundleCount)
+	// 	bundleCount++
+	// }
 
-		appendBundle := func() {
-			bundleValue += " " + midValue
-		}
+	// for _, media := range mediaOrder(pc.RemoteDescription()) {
+	// 	needInactive := true
 
-		switch {
-		case strings.HasPrefix(*remoteMedia.MediaName.String(), "audio"):
-			if pc.addRTPMediaSection(d, RTPCodecTypeAudio, midValue, iceParams, peerDirection, candidates, sdp.ConnectionRoleActive) {
-				appendBundle()
-			}
-		case strings.HasPrefix(*remoteMedia.MediaName.String(), "video"):
-			if pc.addRTPMediaSection(d, RTPCodecTypeVideo, midValue, iceParams, peerDirection, candidates, sdp.ConnectionRoleActive) {
-				appendBundle()
-			}
-		case strings.HasPrefix(*remoteMedia.MediaName.String(), "application"):
-			pc.addDataMediaSection(d, midValue, iceParams, candidates, sdp.ConnectionRoleActive)
-			appendBundle()
-		}
-	}
+	// 	for _, t := range pc.GetTransceivers() {
+	// 		if t.kind == media {
+	// 			pc.addTransceiverSDP(d, t, bundleCount, iceParams, candidates, sdp.ConnectionRoleActive)
+	// 			incrementBundle()
+	// 			needInactive = false
+	// 		}
+	// 	}
 
-	d = d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue)
+	// 	if needInactive {
+	// 		pc.addTransceiverSDP(d, &RTPTransceiver{
+	// 			kind:      media,
+	// 			Direction: RTPTransceiverDirectionInactive,
+	// 		}, bundleCount, iceParams, []ICECandidate{}, sdp.ConnectionRoleActive)
+	// 		incrementBundle()
+	// 	}
+	// }
+	// d = d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue)
 
 	sdp, err := d.Marshal()
 	if err != nil {
@@ -939,13 +924,9 @@ func (pc *PeerConnection) openSRTP() {
 
 	for _, media := range pc.RemoteDescription().parsed.MediaDescriptions {
 		for _, attr := range media.Attributes {
-			var codecType RTPCodecType
-			switch media.MediaName.Media {
-			case "audio":
-				codecType = RTPCodecTypeAudio
-			case "video":
-				codecType = RTPCodecTypeVideo
-			default:
+
+			codecType := parseRTPCodecType(media.MediaName.Media)
+			if codecType == 0 {
 				continue
 			}
 
@@ -981,6 +962,7 @@ func (pc *PeerConnection) openSRTP() {
 				receiver,
 				nil,
 				RTPTransceiverDirectionRecvonly,
+				receiver.Track().Kind(),
 			)
 
 			if err = receiver.Track().determinePayloadType(); err != nil {
@@ -1190,6 +1172,7 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 			nil,
 			sender,
 			RTPTransceiverDirectionSendonly,
+			track.Kind(),
 		)
 	}
 
@@ -1202,9 +1185,23 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 // 	panic("not implemented yet") // FIXME NOT-IMPLEMENTED nolint
 // }
 
-// func (pc *PeerConnection) AddTransceiver() RTPTransceiver {
-// 	panic("not implemented yet") // FIXME NOT-IMPLEMENTED nolint
-// }
+// AddTransceiver Create a new RTCRtpTransceiver and add it to the set of transceivers.
+func (pc *PeerConnection) AddTransceiver(trackOrKind RTPCodecType, init ...RtpTransceiverInit) (*RTPTransceiver, error) {
+	direction := RTPTransceiverDirectionSendrecv
+	if len(init) > 1 {
+		return nil, fmt.Errorf("AddTransceiver only accepts one RtpTransceiverInit")
+	} else if len(init) == 1 {
+		direction = init[0].Direction
+	}
+
+	switch direction {
+	case RTPTransceiverDirectionSendrecv:
+	case RTPTransceiverDirectionSendonly:
+	case RTPTransceiverDirectionRecvonly:
+	}
+
+	return &RTPTransceiver{}, nil
+}
 
 // CreateDataChannel creates a new DataChannel object with the given label
 // and optional DataChannelInit used to configure properties of the
@@ -1406,20 +1403,6 @@ func (pc *PeerConnection) iceStateChange(newState ICEConnectionState) {
 	pc.onICEConnectionStateChange(newState)
 }
 
-func localDirection(weSend bool, peerDirection RTPTransceiverDirection) RTPTransceiverDirection {
-	theySend := (peerDirection == RTPTransceiverDirectionSendrecv || peerDirection == RTPTransceiverDirectionSendonly)
-	switch {
-	case weSend && theySend:
-		return RTPTransceiverDirectionSendrecv
-	case weSend && !theySend:
-		return RTPTransceiverDirectionSendonly
-	case !weSend && theySend:
-		return RTPTransceiverDirectionRecvonly
-	}
-
-	return RTPTransceiverDirectionInactive
-}
-
 func (pc *PeerConnection) addFingerprint(d *sdp.SessionDescription) {
 	// TODO: Handle multiple certificates
 	for _, fingerprint := range pc.configuration.Certificates[0].GetFingerprints() {
@@ -1427,26 +1410,15 @@ func (pc *PeerConnection) addFingerprint(d *sdp.SessionDescription) {
 	}
 }
 
-func (pc *PeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codecType RTPCodecType, midValue string, iceParams ICEParameters, peerDirection RTPTransceiverDirection, candidates []ICECandidate, dtlsRole sdp.ConnectionRole) bool {
-	if codecs := pc.api.mediaEngine.getCodecsByKind(codecType); len(codecs) == 0 {
-		d.WithMedia(&sdp.MediaDescription{
-			MediaName: sdp.MediaName{
-				Media:   codecType.String(),
-				Port:    sdp.RangedPort{Value: 0},
-				Protos:  []string{"UDP", "TLS", "RTP", "SAVPF"},
-				Formats: []string{"0"},
-			},
-		})
-		return false
-	}
-	media := sdp.NewJSEPMediaDescription(codecType.String(), []string{}).
+func (pc *PeerConnection) addTransceiverSDP(d *sdp.SessionDescription, t *RTPTransceiver, midOffset int, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole) {
+	media := sdp.NewJSEPMediaDescription(t.kind.String(), []string{}).
 		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()). // TODO: Support other connection types
-		WithValueAttribute(sdp.AttrKeyMID, midValue).
+		WithValueAttribute(sdp.AttrKeyMID, strconv.Itoa(midOffset)).
 		WithICECredentials(iceParams.UsernameFragment, iceParams.Password).
 		WithPropertyAttribute(sdp.AttrKeyRTCPMux).  // TODO: support RTCP fallback
 		WithPropertyAttribute(sdp.AttrKeyRTCPRsize) // TODO: Support Reduced-Size RTCP?
 
-	for _, codec := range pc.api.mediaEngine.getCodecsByKind(codecType) {
+	for _, codec := range pc.api.mediaEngine.getCodecsByKind(t.kind) {
 		media.WithCodec(codec.PayloadType, codec.Name, codec.ClockRate, codec.Channels, codec.SDPFmtpLine)
 
 		for _, feedback := range codec.RTPCodecCapability.RTCPFeedback {
@@ -1454,19 +1426,12 @@ func (pc *PeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codecTyp
 		}
 	}
 
-	weSend := false
-	for _, transceiver := range pc.rtpTransceivers {
-		if transceiver.Sender == nil ||
-			transceiver.Sender.track == nil ||
-			transceiver.Sender.track.Kind() != codecType {
-			continue
-		}
-		weSend = true
-		track := transceiver.Sender.track
+	if t.Sender != nil && t.Sender.track != nil {
+		track := t.Sender.track
 		media = media.WithMediaSource(track.SSRC(), track.Label() /* cname */, track.Label() /* streamLabel */, track.Label())
 	}
-	media = media.WithPropertyAttribute(localDirection(weSend, peerDirection).String())
 
+	media = media.WithPropertyAttribute(t.Direction.String())
 	for _, c := range candidates {
 		sdpCandidate := c.toSDP()
 		sdpCandidate.ExtensionAttributes = append(sdpCandidate.ExtensionAttributes, sdp.ICECandidateAttribute{Key: "generation", Value: "0"})
@@ -1475,9 +1440,11 @@ func (pc *PeerConnection) addRTPMediaSection(d *sdp.SessionDescription, codecTyp
 		sdpCandidate.Component = 2
 		media.WithICECandidate(sdpCandidate)
 	}
-	media.WithPropertyAttribute("end-of-candidates")
+	if len(candidates) != 0 {
+		media.WithPropertyAttribute("end-of-candidates")
+	}
+
 	d.WithMedia(media)
-	return true
 }
 
 func (pc *PeerConnection) addDataMediaSection(d *sdp.SessionDescription, midValue string, iceParams ICEParameters, candidates []ICECandidate, dtlsRole sdp.ConnectionRole) {
@@ -1531,12 +1498,14 @@ func (pc *PeerConnection) newRTPTransceiver(
 	receiver *RTPReceiver,
 	sender *RTPSender,
 	direction RTPTransceiverDirection,
+	kind RTPCodecType,
 ) *RTPTransceiver {
 
 	t := &RTPTransceiver{
 		Receiver:  receiver,
 		Sender:    sender,
 		Direction: direction,
+		kind:      kind,
 	}
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
