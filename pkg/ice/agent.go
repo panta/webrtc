@@ -4,6 +4,7 @@ package ice
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
 	"net"
 	"sync"
@@ -118,6 +119,10 @@ func (a *Agent) gatherCandidatesLocal() {
 	localIPs := localInterfaces()
 	for _, ip := range localIPs {
 		for _, network := range supportedNetworks {
+			log.Println("-> gatherCandidatesLocal()", network)
+			if network == "udp4" || network == "udp6" {
+				network = "udp"
+			}
 			conn, err := net.ListenUDP(network, &net.UDPAddr{IP: ip, Port: 0})
 			if err != nil {
 				fmt.Printf("could not listen %s %s\n", network, ip)
@@ -144,6 +149,10 @@ func (a *Agent) gatherCandidatesLocal() {
 func (a *Agent) gatherCandidatesReflective(urls []*URL) {
 	for _, networkType := range supportedNetworkTypes {
 		network := networkType.String()
+		log.Println("-> gatherCandidatesReflective() ", network)
+		if network == "udp4" || network == "udp6" {
+			network = "udp"
+		}
 		for _, url := range urls {
 			switch url.Scheme {
 			case SchemeTypeSTUN:
@@ -183,7 +192,13 @@ func (a *Agent) gatherCandidatesReflective(urls []*URL) {
 }
 
 func allocateUDP(network string, url *URL) (*net.UDPAddr, *stun.XorAddress, error) {
+	log.Println("-> allocateUDP ", network, url)
+
 	// TODO Do we want the timeout to be configurable?
+
+	if network == "udp4" || network == "udp6" {
+		network = "udp"
+	}
 	client, err := stun.NewClient(network, fmt.Sprintf("%s:%d", url.Host, url.Port), time.Second*5)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "Failed to create STUN client")
